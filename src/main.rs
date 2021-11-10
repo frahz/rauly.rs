@@ -2,7 +2,7 @@ mod commands;
 
 use std::{collections::HashSet, env, sync::Arc};
 
-use commands::quotes::*;
+use commands::{math::*, quotes::*};
 
 use serenity::{
     async_trait,
@@ -34,7 +34,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(multiply, today)]
+#[commands(multiply, quote)]
 struct General;
 
 #[tokio::main]
