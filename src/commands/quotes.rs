@@ -4,12 +4,6 @@ use serenity::model::prelude::*;
 use serenity::prelude::*;
 
 #[derive(Debug, Deserialize)]
-#[serde(transparent)]
-struct Obj {
-    items: Vec<Quote>,
-}
-
-#[derive(Debug, Deserialize)]
 struct Quote {
     a: String,
     q: String,
@@ -17,27 +11,23 @@ struct Quote {
 }
 
 #[command]
-pub async fn multiply(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let one = args.single::<f64>()?;
-    let two = args.single::<f64>()?;
+#[aliases("q")]
+pub async fn quote(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let argument = args.single::<String>()?;
 
-    let product = one * two;
+    let url = match argument.as_str() {
+        "r" | "random" => "https://zenquotes.io/api/random".to_string(),
+        "t" | "today" => "https://zenquotes.io/api/today".to_string(),
+        _ => {
+            msg.channel_id.say(&ctx.http, "invalid args").await?;
+            return Ok(());
+        }
+    };
+    let res = reqwest::get(url).await?.json::<Vec<Quote>>().await?;
 
-    msg.channel_id.say(&ctx.http, product).await?;
+    let _quote: String = format!("{} - **{}**", res[0].q, res[0].a);
 
-    Ok(())
-}
-
-#[command]
-pub async fn today(ctx: &Context, msg: &Message) -> CommandResult {
-    let res = reqwest::get("https://zenquotes.io/api/today")
-        .await?
-        .json::<Obj>()
-        .await?;
-
-    let quote: String = format!("{} - **{}**", res.items[0].q, res.items[0].a);
-
-    msg.channel_id.say(&ctx.http, quote).await?;
+    msg.channel_id.say(&ctx.http, _quote).await?;
 
     Ok(())
 }
