@@ -1,2 +1,5 @@
 /target
 .env
+
+# lockfile
+Cargo.lock

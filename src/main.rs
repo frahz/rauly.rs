@@ -1,8 +1,7 @@
 mod commands;
+mod utils;
 
 use std::{collections::HashSet, env, sync::Arc};
-
-use commands::{math::*, quotes::*, wotd::*};
 
 use serenity::{
     async_trait,
@@ -13,6 +12,8 @@ use serenity::{
     prelude::*,
 };
 use tracing::{error, info};
+
+use crate::commands::{math::*, quotes::*, wotd::*};
 
 pub struct ShardManagerContainer;
 
@@ -51,7 +52,7 @@ async fn main() {
 
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
-    let http = Http::new_with_token(&token);
+    let http = Http::new(&token);
 
     // We will fetch your bot's owners and id
     let (owners, _bot_id) = match http.get_current_application_info().await {
@@ -69,7 +70,9 @@ async fn main() {
         .configure(|c| c.owners(owners).prefix("~"))
         .group(&GENERAL_GROUP);
 
-    let mut client = Client::builder(&token)
+
+    let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
+    let mut client = Client::builder(&token, intents)
         .framework(framework)
         .event_handler(Handler)
         .await
