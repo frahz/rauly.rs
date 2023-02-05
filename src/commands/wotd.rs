@@ -1,13 +1,12 @@
+use crate::utils;
 use chrono::prelude::*;
-use rand::seq::SliceRandom;
-use std::env;
+use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 use serenity::framework::standard::{macros::command, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use serde::{Serialize, Deserialize};
+use std::env;
 use tracing::{error, info};
-use crate::utils;
-
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,7 +50,10 @@ struct Example {
 pub async fn word(ctx: &Context, msg: &Message) -> CommandResult {
     info!("Sending Word of the Day");
     let wordnik_api = env::var("WORDNIK_API_KEY").expect("wordnik api key");
-    let url = format!("https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key={}",wordnik_api);
+    let url = format!(
+        "https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key={}",
+        wordnik_api
+    );
 
     let dt = Utc::now().format("%B %d, %Y");
     let color = utils::COLORS.choose(&mut rand::thread_rng()).unwrap();
@@ -60,12 +62,16 @@ pub async fn word(ctx: &Context, msg: &Message) -> CommandResult {
         Ok(r) => r,
         Err(e) => {
             error!("Problem parsing JSON: {:?}", e);
-            msg.channel_id.say(&ctx.http, "had a problem parsing JSON!").await?;
+            msg.channel_id
+                .say(&ctx.http, "had a problem parsing JSON!")
+                .await?;
             return Ok(());
-        },
+        }
     };
 
-    let example = res.examples[0].text.replace(&res.word, &format!("**{}**", res.word));
+    let example = res.examples[0]
+        .text
+        .replace(&res.word, &format!("**{}**", res.word));
 
     msg.channel_id
         .send_message(&ctx.http, |m| {
@@ -73,7 +79,11 @@ pub async fn word(ctx: &Context, msg: &Message) -> CommandResult {
                 e.title(format!("{} | {}", res.word, dt))
                     .colour(*color)
                     // .field("Pronounciation", res.publish_date, false)
-                    .field("Word type", format!("*{}*", res.definitions[0].part_of_speech), false)
+                    .field(
+                        "Word type",
+                        format!("*{}*", res.definitions[0].part_of_speech),
+                        false,
+                    )
                     .field("Definition", &res.definitions[0].text, false)
                     .field("Example", example, false)
                     .field("Note", res.note, false)
@@ -87,4 +97,3 @@ pub async fn word(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
-
