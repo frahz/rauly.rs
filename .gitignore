@@ -3,3 +3,5 @@
 
 # lockfile
 Cargo.lock
+
+config.json

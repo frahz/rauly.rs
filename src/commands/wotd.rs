@@ -1,67 +1,19 @@
-use crate::utils;
+use crate::{models::word, utils};
 use chrono::prelude::*;
 use rand::prelude::*;
-use serde::{Deserialize, Serialize};
 use serenity::framework::standard::{macros::command, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use std::env;
-use tracing::{error, info};
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Response {
-    #[serde(rename = "_id")]
-    id: String,
-    word: String,
-    content_provider: ContentProvider,
-    definitions: Vec<Definition>,
-    publish_date: String,
-    examples: Vec<Example>,
-    pdd: String,
-    html_extra: Option<String>,
-    note: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ContentProvider {
-    name: String,
-    id: u32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Definition {
-    source: String,
-    text: String,
-    note: Option<String>,
-    part_of_speech: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Example {
-    url: String,
-    title: String,
-    text: String,
-    id: Option<u32>,
-}
 
 #[command]
 pub async fn word(ctx: &Context, msg: &Message) -> CommandResult {
-    info!("Sending Word of the Day");
-    let wordnik_api = env::var("WORDNIK_API_KEY").expect("wordnik api key");
-    let url = format!(
-        "https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key={}",
-        wordnik_api
-    );
 
     let dt = Utc::now().format("%B %d, %Y");
     let color = utils::COLORS.choose(&mut rand::thread_rng()).unwrap();
 
-    let res = match reqwest::get(url).await?.json::<Response>().await {
+    let res = match word::word().await {
         Ok(r) => r,
-        Err(e) => {
-            error!("Problem parsing JSON: {:?}", e);
+        Err(_) => {
             msg.channel_id
                 .say(&ctx.http, "had a problem parsing JSON!")
                 .await?;

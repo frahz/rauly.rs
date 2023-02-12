@@ -1,5 +1,6 @@
 mod commands;
 mod utils;
+mod models;
 
 use std::{collections::HashSet, env, sync::Arc};
 
@@ -13,7 +14,7 @@ use serenity::{
 };
 use tracing::{error, info};
 
-use crate::commands::{math::*, quotes::*, wotd::*};
+use crate::commands::{math::*, quotes::*, wotd::*, guild::*};
 
 pub struct ShardManagerContainer;
 
@@ -35,7 +36,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(multiply, quote, word)]
+#[commands(multiply, quote, word, get_guild)]
 struct General;
 
 #[tokio::main]
