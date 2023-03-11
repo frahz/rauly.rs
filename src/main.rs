@@ -1,6 +1,7 @@
 mod commands;
 mod utils;
 mod models;
+mod voice;
 
 use std::{collections::HashSet, env, sync::Arc};
 
@@ -12,9 +13,11 @@ use serenity::{
     model::{event::ResumedEvent, gateway::Ready},
     prelude::*,
 };
+use songbird::SerenityInit;
 use tracing::{error, info};
 
 use crate::commands::{math::*, quotes::*, wotd::*, guild::*};
+use crate::voice::*;
 
 pub struct ShardManagerContainer;
 
@@ -37,7 +40,13 @@ impl EventHandler for Handler {
 
 #[group]
 #[commands(multiply, quote, word, get_guild)]
+#[sub_groups(voice)]
 struct General;
+
+#[group]
+#[prefix = "v"]
+#[commands(join, leave, play)]
+struct Voice;
 
 #[tokio::main]
 async fn main() {
@@ -74,6 +83,7 @@ async fn main() {
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
     let mut client = Client::builder(&token, intents)
         .framework(framework)
+        .register_songbird()
         .event_handler(Handler)
         .await
         .expect("Err creating client");
