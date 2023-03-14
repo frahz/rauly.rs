@@ -38,7 +38,8 @@ pub async fn get_guild(ctx: &Context, msg: &Message) -> CommandResult {
     }
     config[1].test_update(&ctx.http).await?;
     config[0].test_update(&ctx.http).await?;
-    msg.channel_id.say(&ctx.http, "Read guilds succesfully").await?;
+    msg.channel_id
+        .say(&ctx.http, "Read guilds succesfully")
+        .await?;
     Ok(())
 }
-

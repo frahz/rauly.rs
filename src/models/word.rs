@@ -56,5 +56,4 @@ pub async fn word() -> Result<Response> {
             Err(e.into())
         }
     }
-
 }

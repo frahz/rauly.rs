@@ -1,6 +1,6 @@
 mod commands;
-mod utils;
 mod models;
+mod utils;
 mod voice;
 
 use std::{collections::HashSet, env, sync::Arc};
@@ -16,7 +16,7 @@ use serenity::{
 use songbird::SerenityInit;
 use tracing::{error, info};
 
-use crate::commands::{math::*, quotes::*, wotd::*, guild::*};
+use crate::commands::{guild::*, math::*, quotes::*, wotd::*};
 use crate::voice::*;
 
 pub struct ShardManagerContainer;
@@ -45,7 +45,7 @@ struct General;
 
 #[group]
 #[prefix = "v"]
-#[commands(join, leave, play)]
+#[commands(join, leave, play, pause, resume, search, skip, stop, info)]
 struct Voice;
 
 #[tokio::main]

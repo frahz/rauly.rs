@@ -7,7 +7,6 @@ use serenity::prelude::*;
 
 #[command]
 pub async fn word(ctx: &Context, msg: &Message) -> CommandResult {
-
     let dt = Utc::now().format("%B %d, %Y");
     let color = utils::COLORS.choose(&mut rand::thread_rng()).unwrap();
 

@@ -2,8 +2,8 @@ use anyhow::Result;
 use chrono::prelude::*;
 use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
-use serenity::model::prelude::*;
 use serenity::http::Http;
+use serenity::model::prelude::*;
 use tracing::{error, info};
 
 pub type Guilds = Vec<Guild>;
@@ -31,8 +31,13 @@ impl Guild {
         info!("{}", self.wotd_time);
         let wotime = NaiveTime::parse_from_str(&self.wotd_time, "%H:%M").unwrap();
         let time = Utc::now().with_timezone(&tz);
-        let msg = self.wotd_channel_id.say(&http, format!("Testing Now: {}\n Word of the Day Time: {}", time, wotime)).await?;
+        let msg = self
+            .wotd_channel_id
+            .say(
+                &http,
+                format!("Testing Now: {}\n Word of the Day Time: {}", time, wotime),
+            )
+            .await?;
         Ok(msg)
     }
 }
-
