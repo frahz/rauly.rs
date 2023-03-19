@@ -79,7 +79,7 @@ impl EventHandler for Handler {
 struct General;
 
 #[group]
-#[prefix = "v"]
+#[prefix = "m"]
 #[commands(join, leave, play, pause, resume, search, skip, stop, info)]
 struct Voice;
 
