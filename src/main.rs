@@ -10,7 +10,11 @@ use serenity::{
     client::bridge::gateway::ShardManager,
     framework::{standard::macros::group, StandardFramework},
     http::Http,
-    model::{event::ResumedEvent, gateway::Ready},
+    model::{
+        event::ResumedEvent,
+        gateway::Ready,
+        guild::Member,
+    },
     prelude::*,
 };
 use songbird::SerenityInit;
@@ -35,6 +39,37 @@ impl EventHandler for Handler {
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
         info!("Resumed");
+    }
+
+    async fn guild_member_addition(&self, ctx: Context, mut _member: Member) {
+        let guild_id = env::var("GUILD_ID")
+            .expect("Guild ID")
+            .parse::<u64>()
+            .expect("GUILD_ID as u64");
+
+        let role_id = env::var("ROLE_ID")
+            .expect("Role ID")
+            .parse::<u64>()
+            .expect("ROLE_ID as u64");
+
+        let user_id = _member.user.id.as_u64().to_owned();
+
+        if _member.guild_id.as_u64() != &guild_id {
+            return;
+        }
+
+        match ctx
+            .http
+            .add_member_role(guild_id, user_id, role_id, Some("Default Role"))
+            .await
+        {
+            Ok(_) => info!("added role to new member"),
+            Err(e) => {
+                error!("error adding role to member: {}", e);
+                return;
+            }
+        };
+
     }
 }
 
@@ -80,7 +115,9 @@ async fn main() {
         .configure(|c| c.owners(owners).prefix("~"))
         .group(&GENERAL_GROUP);
 
-    let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::non_privileged()
+        | GatewayIntents::MESSAGE_CONTENT
+        | GatewayIntents::GUILD_MEMBERS;
     let mut client = Client::builder(&token, intents)
         .framework(framework)
         .register_songbird()
