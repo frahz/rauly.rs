@@ -21,7 +21,7 @@ use songbird::SerenityInit;
 use tracing::{error, info};
 
 use crate::commands::{guild::*, math::*, quotes::*, wotd::*};
-use crate::voice::*;
+use crate::voice::cmds::*;
 
 pub struct ShardManagerContainer;
 
