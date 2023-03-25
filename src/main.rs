@@ -10,11 +10,7 @@ use serenity::{
     client::bridge::gateway::ShardManager,
     framework::{standard::macros::group, StandardFramework},
     http::Http,
-    model::{
-        event::ResumedEvent,
-        gateway::Ready,
-        guild::Member,
-    },
+    model::{event::ResumedEvent, gateway::Ready, guild::Member},
     prelude::*,
 };
 use songbird::SerenityInit;
@@ -69,7 +65,6 @@ impl EventHandler for Handler {
                 return;
             }
         };
-
     }
 }
 
@@ -80,7 +75,7 @@ struct General;
 
 #[group]
 #[prefix = "m"]
-#[commands(join, leave, play, pause, resume, search, skip, stop, info)]
+#[commands(join, leave, play, pause, resume, skip, stop, info)]
 struct Voice;
 
 #[tokio::main]
