@@ -1,3 +1,4 @@
+use crate::voice::disconnect_handler::ChannelDisconnect;
 use serenity::builder::CreateEmbed;
 use serenity::framework::standard::{macros::command, Args, CommandResult};
 use serenity::model::prelude::*;
@@ -100,6 +101,9 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     }
 
     if let Some(handler_lock) = manager.get(guild_id) {
+        let _dch = ChannelDisconnect::new(manager.clone(), ctx.http.clone(), guild_id)
+            .register_handler(&handler_lock)
+            .await;
         let mut handler = handler_lock.lock().await;
 
         let resolved_source = match is_url {
