@@ -53,8 +53,11 @@ impl ChannelDisconnect {
 
         if should_close {
             info!("Leaving voice channel.");
-            let _dc = self.manager.leave(self.guild_id).await;
+            let _dc = self.manager.remove(self.guild_id).await;
             info!("Left voice channel.");
+            {
+                *HANDLER_ADDED.write().await = false;
+            }
         }
     }
 }
