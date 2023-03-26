@@ -1,3 +1,4 @@
+use crate::voice::disconnect_handler::ChannelDisconnect;
 use serenity::builder::CreateEmbed;
 use serenity::framework::standard::{macros::command, Args, CommandResult};
 use serenity::model::prelude::*;
@@ -67,29 +68,10 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[only_in(guilds)]
-async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    let url = match args.single::<String>() {
-        Ok(url) => url,
-        Err(_) => {
-            check_msg(
-                msg.channel_id
-                    .say(&ctx.http, "Must provide a URL to a video or audio")
-                    .await,
-            );
-
-            return Ok(());
-        }
-    };
-
-    if !url.starts_with("http") {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Must provide a valid URL")
-                .await,
-        );
-
-        return Ok(());
-    }
+#[aliases("p")]
+async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let song = args.rest().to_owned();
+    let is_url = song.starts_with("http");
 
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
@@ -119,80 +101,17 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     }
 
     if let Some(handler_lock) = manager.get(guild_id) {
+        let _dch = ChannelDisconnect::new(manager.clone(), ctx.http.clone(), guild_id)
+            .register_handler(&handler_lock)
+            .await;
         let mut handler = handler_lock.lock().await;
 
-        let source = match Restartable::ytdl(url, true).await {
-            Ok(source) => source,
-            Err(why) => {
-                error!("Err starting source: {:?}", why);
-
-                check_msg(msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await);
-
-                return Ok(());
-            }
+        let resolved_source = match is_url {
+            true => Restartable::ytdl(song, true).await,
+            false => Restartable::ytdl_search(song, true).await,
         };
 
-        let current = handler.enqueue_source(source.into());
-
-        let embed = song_embed(current, handler.queue().len());
-        check_msg(
-            msg.channel_id
-                .send_message(&ctx.http, |m| {
-                    m.embed(|e| {
-                        e.0 = embed.0;
-                        e
-                    })
-                })
-                .await,
-        );
-    } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
-    }
-
-    Ok(())
-}
-
-#[command]
-#[only_in(guilds)]
-#[aliases("se")]
-async fn search(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let song = args.rest();
-
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
-
-    let manager = songbird::get(ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialisation.")
-        .clone();
-
-    let has_handler = manager.get(guild_id).is_some();
-    if !has_handler {
-        let channel_id = guild
-            .voice_states
-            .get(&msg.author.id)
-            .and_then(|voice_state| voice_state.channel_id);
-
-        let connect_to = match channel_id {
-            Some(channel) => channel,
-            None => {
-                check_msg(msg.reply(ctx, "Not in a voice channel").await);
-
-                return Ok(());
-            }
-        };
-
-        let _handler = manager.join(guild_id, connect_to).await;
-    }
-
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-
-        let source = match Restartable::ytdl_search(song, true).await {
+        let source = match resolved_source {
             Ok(source) => source,
             Err(why) => {
                 error!("Err starting source: {:?}", why);
