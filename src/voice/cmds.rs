@@ -302,8 +302,8 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
             let metadata = track.metadata();
             info!(
                 "Artist: {} Track: {}",
-                metadata.artist.as_ref().unwrap(),
-                metadata.track.as_ref().unwrap()
+                metadata.artist.clone().unwrap_or("<Unknown>".to_string()),
+                metadata.track.clone().unwrap_or("<Unknown>".to_string())
             );
         }
 
