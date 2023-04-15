@@ -9,7 +9,7 @@ use std::{sync::Arc, time::Duration};
 use tracing::info;
 
 static HANDLER_ADDED: Lazy<RwLock<bool>> = Lazy::new(|| RwLock::new(false));
-const TIMEOUT_SECS: u64 = 420;
+const TIMEOUT_SECS: u64 = 20;
 
 #[derive(Clone)]
 pub struct ChannelDisconnect {
@@ -27,7 +27,7 @@ impl ChannelDisconnect {
         }
     }
 
-    pub async fn register_handler(&self, handler_lock: &Arc<Mutex<Call>>) {
+    pub async fn register_handler(self, handler_lock: &Arc<Mutex<Call>>) {
         if !*HANDLER_ADDED.read().await {
             info!("Register handler for disconnect");
             let mut ha = HANDLER_ADDED.write().await;
@@ -35,7 +35,7 @@ impl ChannelDisconnect {
             let mut handler = handler_lock.lock().await;
             handler.add_global_event(
                 Event::Periodic(Duration::from_secs(TIMEOUT_SECS), None),
-                self.clone(),
+                self,
             );
         } else {
             info!("No handler");
@@ -68,5 +68,15 @@ impl EventHandler for ChannelDisconnect {
         info!("Checking if bot is active");
         self.disconnect().await;
         None
+    }
+}
+
+impl Drop for ChannelDisconnect {
+    fn drop(&mut self) {
+        info!("dropping disconnect handler!");
+        tokio::spawn(async move {
+            info!("setting handler to false?");
+            *HANDLER_ADDED.write().await = false;
+        });
     }
 }

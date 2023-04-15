@@ -57,6 +57,11 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
                     .await,
             );
         }
+        if let Some(handler_lock) = manager.get(guild_id) {
+            let mut handler = handler_lock.lock().await;
+            handler.remove_all_global_events();
+            info!("removing handlers");
+        }
 
         check_msg(msg.channel_id.say(&ctx.http, "Left voice channel").await);
     } else {
