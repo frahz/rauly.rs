@@ -9,7 +9,7 @@ use std::{sync::Arc, time::Duration};
 use tracing::info;
 
 static HANDLER_ADDED: Lazy<RwLock<bool>> = Lazy::new(|| RwLock::new(false));
-const TIMEOUT_SECS: u64 = 20;
+const TIMEOUT_SECS: u64 = 420;
 
 #[derive(Clone)]
 pub struct ChannelDisconnect {
