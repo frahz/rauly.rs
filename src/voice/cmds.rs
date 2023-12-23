@@ -303,16 +303,32 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
         let handler = handler_lock.lock().await;
 
         let list = handler.queue().current_queue();
-        for track in list {
+        let mut queue_info = String::new();
+
+        for (index, track) in list.iter().enumerate() {
             let metadata = track.metadata();
-            info!(
-                "Artist: {} Track: {}",
-                metadata.artist.clone().unwrap_or("<Unknown>".to_string()),
-                metadata.track.clone().unwrap_or("<Unknown>".to_string())
-            );
+            let artist = metadata.artist.clone().unwrap_or("<Unknown>".to_string());
+            let track_name = metadata.track.clone().unwrap_or("<Unknown>".to_string());
+
+            queue_info.push_str(&format!(
+                "{}: Artist: {} Track: {}\n",
+                index + 1,
+                artist,
+                track_name
+            ));
         }
 
-        check_msg(msg.channel_id.say(&ctx.http, "printing queue info").await);
+        if !queue_info.is_empty() {
+            if let Err(why) = msg
+                .channel_id
+                .say(&ctx.http, format!("Queue Info:\n{}", queue_info))
+                .await
+            {
+                eprintln!("Error sending message: {:?}", why);
+            }
+        } else {
+            check_msg(msg.channel_id.say(&ctx.http, "The queue is empty.").await);
+        }
     } else {
         check_msg(
             msg.channel_id
