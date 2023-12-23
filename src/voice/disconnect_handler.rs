@@ -8,6 +8,7 @@ use songbird::{Call, Event, EventContext, EventHandler, Songbird};
 use std::{sync::Arc, time::Duration};
 use tracing::info;
 
+// Lazy-initialized static variable to track whether the disconnect handler has been added
 static HANDLER_ADDED: Lazy<RwLock<bool>> = Lazy::new(|| RwLock::new(false));
 const TIMEOUT_SECS: u64 = 420;
 
@@ -27,6 +28,7 @@ impl ChannelDisconnect {
         }
     }
 
+    // Registering the handler for disconnection events
     pub async fn register_handler(self, handler_lock: &Arc<Mutex<Call>>) {
         if !*HANDLER_ADDED.read().await {
             info!("Register handler for disconnect");
@@ -42,6 +44,7 @@ impl ChannelDisconnect {
         }
     }
 
+    // Method to handle disconnecting from a voice channel
     async fn disconnect(&self) {
         let should_close = match self.manager.get(self.guild_id) {
             None => false,
