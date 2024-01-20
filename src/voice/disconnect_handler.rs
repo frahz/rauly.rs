@@ -70,13 +70,3 @@ impl EventHandler for ChannelDisconnect {
         None
     }
 }
-
-// impl Drop for ChannelDisconnect {
-//     fn drop(&mut self) {
-//         info!("dropping disconnect handler!");
-//         tokio::spawn(async move {
-//             info!("setting handler to false?");
-//             *HANDLER_ADDED.write().await = false;
-//         });
-//     }
-// }
