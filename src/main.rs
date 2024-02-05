@@ -32,12 +32,6 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<ShardManager>;
 }
 
-pub struct HttpKey;
-
-impl TypeMapKey for HttpKey {
-    type Value = HttpClient;
-}
-
 struct Handler;
 
 #[async_trait]
@@ -131,7 +125,7 @@ async fn main() {
         .framework(framework)
         .register_songbird()
         .event_handler(Handler)
-        .type_map_insert::<HttpKey>(HttpClient::new())
+        .type_map_insert::<VoiceHttpKey>(HttpClient::new())
         .await
         .expect("Err creating client");
 

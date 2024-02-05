@@ -1,5 +1,4 @@
 use crate::voice::disconnect_handler::ChannelDisconnect;
-use crate::HttpKey;
 use reqwest::Client as HttpClient;
 use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
 use serenity::framework::standard::{macros::command, Args, CommandResult};
@@ -9,6 +8,12 @@ use serenity::Result as SerenityResult;
 use songbird::input::Compose;
 use songbird::{input::YoutubeDl, tracks::TrackHandle};
 use tracing::{error, info};
+
+pub struct VoiceHttpKey;
+
+impl TypeMapKey for VoiceHttpKey {
+    type Value = HttpClient;
+}
 
 #[command]
 #[only_in(guilds)]
@@ -115,26 +120,16 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
             .await;
         let mut handler = handler_lock.lock().await;
 
-        // let resolved_source = match is_url {
-        //     true => Restartable::ytdl(song, true).await,
-        //     false => Restartable::ytdl_search(song, true).await,
-        // };
-
-        // let source = match resolved_source {
-        //     Ok(source) => source,
-        //     Err(why) => {
-        //         error!("Err starting source: {:?}", why);
-
-        //         check_msg(msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await);
-
-        //         return Ok(());
-        //     }
-        // };
+        // TODO: make this faster with less cloning
         let http_client = get_http_client(ctx).await;
-        let mut source = YoutubeDl::new(http_client, song);
+        let mut source = if is_url {
+            YoutubeDl::new(http_client, song)
+        } else {
+            YoutubeDl::new_search(http_client, song)
+        };
 
+        handler.enqueue_input(source.clone().into()).await;
         let embed = song_embed(&mut source, handler.queue().len()).await;
-        let current = handler.enqueue_input(source.into()).await;
 
         let builder = CreateMessage::new().embed(embed);
         check_msg(msg.channel_id.send_message(&ctx.http, builder).await);
@@ -298,7 +293,7 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
         let list = handler.queue().current_queue();
         for track in list {
             let metadata = get_metadata(&track).await;
-            info!("Artist: {} Track: {}", metadata.0, metadata.1);
+            info!("Artist: {} Title: {}", metadata.0, metadata.1);
         }
 
         check_msg(msg.channel_id.say(&ctx.http, "printing queue info").await);
@@ -319,7 +314,7 @@ async fn get_metadata(track_handle: &TrackHandle) -> (String, String) {
 
 async fn get_http_client(ctx: &Context) -> HttpClient {
     let data = ctx.data.read().await;
-    data.get::<HttpKey>()
+    data.get::<VoiceHttpKey>()
         .cloned()
         .expect("Guaranteed to exist in the typemap")
 }
@@ -331,10 +326,11 @@ fn check_msg(result: SerenityResult<Message>) {
 
 async fn song_embed(current_track: &mut impl Compose, postion: usize) -> CreateEmbed {
     let footer = CreateEmbedFooter::new("rauly.rs");
-    let mut embed = CreateEmbed::new()
-        .title("rauly.rs | music")
-        .colour(0xeb984e);
-    let embed = if let Ok(metadata) = current_track.aux_metadata().await {
+    let mut embed = CreateEmbed::new().colour(0xeb984e);
+    if let Ok(metadata) = current_track.aux_metadata().await {
+        if let Some(title) = metadata.title {
+            embed = embed.title(format!("rauly.rs | {}", title));
+        }
         if let Some(artist) = metadata.artist {
             embed = embed.field("Artist", artist.to_string(), true);
         }
@@ -356,10 +352,7 @@ async fn song_embed(current_track: &mut impl Compose, postion: usize) -> CreateE
         if let Some(thumbnail) = metadata.thumbnail {
             embed = embed.image(thumbnail);
         }
-        embed
-    } else {
-        embed
-    };
+    }
 
     embed
         .field("Position in Queue", format!("{}", postion), false)
