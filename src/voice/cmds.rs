@@ -1,28 +1,32 @@
 use crate::voice::disconnect_handler::ChannelDisconnect;
-use serenity::builder::CreateEmbed;
+use crate::HttpKey;
+use reqwest::Client as HttpClient;
+use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
 use serenity::framework::standard::{macros::command, Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use serenity::Result as SerenityResult;
-use songbird::{input::Restartable, tracks::TrackHandle};
+use songbird::input::Compose;
+use songbird::{input::YoutubeDl, tracks::TrackHandle};
 use tracing::{error, info};
 
 #[command]
 #[only_in(guilds)]
 pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
+    let (guild_id, channel_id) = {
+        let guild = msg.guild(&ctx.cache).unwrap();
 
-    let channel_id = guild
-        .voice_states
-        .get(&msg.author.id)
-        .and_then(|voice_state| voice_state.channel_id);
+        let channel_id = guild
+            .voice_states
+            .get(&msg.author.id)
+            .and_then(|voice_state| voice_state.channel_id);
+        (guild.id, channel_id)
+    };
 
     let connect_to = match channel_id {
         Some(channel) => channel,
         None => {
             check_msg(msg.reply(ctx, "Not in a voice channel").await);
-
             return Ok(());
         }
     };
@@ -40,8 +44,7 @@ pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
+    let guild_id = msg.guild_id.unwrap();
 
     let manager = songbird::get(ctx)
         .await
@@ -78,20 +81,21 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let song = args.rest().to_owned();
     let is_url = song.starts_with("http");
 
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
+    let guild_id = msg.guild_id.unwrap();
 
     let manager = songbird::get(ctx)
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
 
-    let has_handler = manager.get(guild_id).is_some();
-    if !has_handler {
-        let channel_id = guild
-            .voice_states
-            .get(&msg.author.id)
-            .and_then(|voice_state| voice_state.channel_id);
+    if manager.get(guild_id).is_none() {
+        let channel_id = {
+            let guild = msg.guild(&ctx.cache).unwrap();
+            guild
+                .voice_states
+                .get(&msg.author.id)
+                .and_then(|voice_state| voice_state.channel_id)
+        };
 
         let connect_to = match channel_id {
             Some(channel) => channel,
@@ -111,35 +115,29 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
             .await;
         let mut handler = handler_lock.lock().await;
 
-        let resolved_source = match is_url {
-            true => Restartable::ytdl(song, true).await,
-            false => Restartable::ytdl_search(song, true).await,
-        };
+        // let resolved_source = match is_url {
+        //     true => Restartable::ytdl(song, true).await,
+        //     false => Restartable::ytdl_search(song, true).await,
+        // };
 
-        let source = match resolved_source {
-            Ok(source) => source,
-            Err(why) => {
-                error!("Err starting source: {:?}", why);
+        // let source = match resolved_source {
+        //     Ok(source) => source,
+        //     Err(why) => {
+        //         error!("Err starting source: {:?}", why);
 
-                check_msg(msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await);
+        //         check_msg(msg.channel_id.say(&ctx.http, "Error sourcing ffmpeg").await);
 
-                return Ok(());
-            }
-        };
+        //         return Ok(());
+        //     }
+        // };
+        let http_client = get_http_client(ctx).await;
+        let mut source = YoutubeDl::new(http_client, song);
 
-        let current = handler.enqueue_source(source.into());
+        let embed = song_embed(&mut source, handler.queue().len()).await;
+        let current = handler.enqueue_input(source.into()).await;
 
-        let embed = song_embed(current, handler.queue().len());
-        check_msg(
-            msg.channel_id
-                .send_message(&ctx.http, |m| {
-                    m.embed(|e| {
-                        e.0 = embed.0;
-                        e
-                    })
-                })
-                .await,
-        );
+        let builder = CreateMessage::new().embed(embed);
+        check_msg(msg.channel_id.send_message(&ctx.http, builder).await);
     } else {
         check_msg(
             msg.channel_id
@@ -154,8 +152,7 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 async fn pause(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
+    let guild_id = msg.guild_id.unwrap();
 
     let manager = songbird::get(ctx)
         .await
@@ -189,8 +186,7 @@ async fn pause(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 async fn resume(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
+    let guild_id = msg.guild_id.unwrap();
 
     let manager = songbird::get(ctx)
         .await
@@ -224,8 +220,7 @@ async fn resume(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
+    let guild_id = msg.guild_id.unwrap();
 
     let manager = songbird::get(ctx)
         .await
@@ -256,8 +251,7 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 async fn skip(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
+    let guild_id = msg.guild_id.unwrap();
 
     let manager = songbird::get(ctx)
         .await
@@ -291,8 +285,7 @@ async fn skip(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[only_in(guilds)]
 async fn info(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild = msg.guild(&ctx.cache).unwrap();
-    let guild_id = guild.id;
+    let guild_id = msg.guild_id.unwrap();
 
     let manager = songbird::get(ctx)
         .await
@@ -304,12 +297,8 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
 
         let list = handler.queue().current_queue();
         for track in list {
-            let metadata = track.metadata();
-            info!(
-                "Artist: {} Track: {}",
-                metadata.artist.clone().unwrap_or("<Unknown>".to_string()),
-                metadata.track.clone().unwrap_or("<Unknown>".to_string())
-            );
+            let metadata = get_metadata(&track).await;
+            info!("Artist: {} Track: {}", metadata.0, metadata.1);
         }
 
         check_msg(msg.channel_id.say(&ctx.http, "printing queue info").await);
@@ -324,61 +313,55 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+async fn get_metadata(track_handle: &TrackHandle) -> (String, String) {
+    todo!()
+}
+
+async fn get_http_client(ctx: &Context) -> HttpClient {
+    let data = ctx.data.read().await;
+    data.get::<HttpKey>()
+        .cloned()
+        .expect("Guaranteed to exist in the typemap")
+}
 fn check_msg(result: SerenityResult<Message>) {
     if let Err(why) = result {
         error!("Error sending message: {:?}", why);
     }
 }
 
-fn song_embed(current_track: TrackHandle, postion: usize) -> CreateEmbed {
-    let dummy = "<Unknown>".to_string();
-    let dummy_duration = std::time::Duration::new(60, 0);
-
-    let artist = current_track
-        .metadata()
-        .artist
-        .as_ref()
-        .unwrap_or_else(|| &dummy);
-    let track = current_track
-        .metadata()
-        .track
-        .as_ref()
-        .unwrap_or_else(|| &dummy);
-    let track_url = current_track
-        .metadata()
-        .source_url
-        .as_ref()
-        .unwrap_or_else(|| &dummy);
-    let track_len = current_track
-        .metadata()
-        .duration
-        .as_ref()
-        .unwrap_or_else(|| &dummy_duration);
-    let track_min = (track_len.as_secs() / 60) % 60;
-    let track_secs = track_len.as_secs() % 60;
-    let thumbnail = current_track
-        .metadata()
-        .thumbnail
-        .as_ref()
-        .unwrap_or_else(|| &dummy);
-
-    let embed = CreateEmbed::default()
+async fn song_embed(current_track: &mut impl Compose, postion: usize) -> CreateEmbed {
+    let footer = CreateEmbedFooter::new("rauly.rs");
+    let mut embed = CreateEmbed::new()
         .title("rauly.rs | music")
-        .colour(0xeb984e)
-        .url(track_url)
-        .field("Artist", format!("{}", artist), true)
-        .field("Track", format!("{}", track), true)
-        .field(
-            "Song Duration",
-            format!("{}:{:0>2}", track_min, track_secs),
-            false,
-        )
-        .field("Position in Queue", format!("{}", postion), false)
-        .image(thumbnail)
-        .footer(|f| {
-            f.text("rauly.rs");
-            f
-        })
-        .to_owned();
+        .colour(0xeb984e);
+    let embed = if let Ok(metadata) = current_track.aux_metadata().await {
+        if let Some(artist) = metadata.artist {
+            embed = embed.field("Artist", artist.to_string(), true);
+        }
+        if let Some(track) = metadata.track {
+            embed = embed.field("Track", track.to_string(), true);
+        }
+        if let Some(track_url) = metadata.source_url {
+            embed = embed.url(track_url);
+        }
+        if let Some(track_len) = metadata.duration {
+            let track_min = (track_len.as_secs() / 60) % 60;
+            let track_secs = track_len.as_secs() % 60;
+            embed = embed.field(
+                "Song Duration",
+                format!("{}:{:0>2}", track_min, track_secs),
+                false,
+            );
+        }
+        if let Some(thumbnail) = metadata.thumbnail {
+            embed = embed.image(thumbnail);
+        }
+        embed
+    } else {
+        embed
+    };
+
     embed
+        .field("Position in Queue", format!("{}", postion), false)
+        .footer(footer)
 }

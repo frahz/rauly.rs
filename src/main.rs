@@ -6,13 +6,20 @@ mod voice;
 use std::{collections::HashSet, env, sync::Arc};
 
 use serenity::{
+    all::{GuildId, RoleId},
     async_trait,
-    client::bridge::gateway::ShardManager,
-    framework::{standard::macros::group, StandardFramework},
+    framework::{
+        standard::{macros::group, Configuration},
+        StandardFramework,
+    },
+    gateway::ShardManager,
     http::Http,
     model::{event::ResumedEvent, gateway::Ready, guild::Member},
     prelude::*,
 };
+
+use reqwest::Client as HttpClient;
+
 use songbird::SerenityInit;
 use tracing::{error, info};
 
@@ -22,7 +29,13 @@ use crate::voice::cmds::*;
 pub struct ShardManagerContainer;
 
 impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<Mutex<ShardManager>>;
+    type Value = Arc<ShardManager>;
+}
+
+pub struct HttpKey;
+
+impl TypeMapKey for HttpKey {
+    type Value = HttpClient;
 }
 
 struct Handler;
@@ -40,17 +53,17 @@ impl EventHandler for Handler {
     async fn guild_member_addition(&self, ctx: Context, mut _member: Member) {
         let guild_id = env::var("GUILD_ID")
             .expect("Guild ID")
-            .parse::<u64>()
+            .parse::<GuildId>()
             .expect("GUILD_ID as u64");
 
         let role_id = env::var("ROLE_ID")
             .expect("Role ID")
-            .parse::<u64>()
+            .parse::<RoleId>()
             .expect("ROLE_ID as u64");
 
-        let user_id = _member.user.id.as_u64().to_owned();
+        let user_id = _member.user.id;
 
-        if _member.guild_id.as_u64() != &guild_id {
+        if _member.guild_id != guild_id {
             return;
         }
 
@@ -98,7 +111,9 @@ async fn main() {
     let (owners, _bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
             let mut owners = HashSet::new();
-            owners.insert(info.owner.id);
+            if let Some(owner) = &info.owner {
+                owners.insert(owner.id);
+            }
 
             (owners, info.id)
         }
@@ -106,9 +121,8 @@ async fn main() {
     };
 
     // Create the framework
-    let framework = StandardFramework::new()
-        .configure(|c| c.owners(owners).prefix("~"))
-        .group(&GENERAL_GROUP);
+    let framework = StandardFramework::new().group(&GENERAL_GROUP);
+    framework.configure(Configuration::new().owners(owners).prefix("~"));
 
     let intents = GatewayIntents::non_privileged()
         | GatewayIntents::MESSAGE_CONTENT
@@ -117,6 +131,7 @@ async fn main() {
         .framework(framework)
         .register_songbird()
         .event_handler(Handler)
+        .type_map_insert::<HttpKey>(HttpClient::new())
         .await
         .expect("Err creating client");
 
@@ -131,7 +146,7 @@ async fn main() {
         tokio::signal::ctrl_c()
             .await
             .expect("Could not register ctrl+c handler");
-        shard_manager.lock().await.shutdown_all().await;
+        shard_manager.shutdown_all().await;
     });
 
     if let Err(why) = client.start().await {
