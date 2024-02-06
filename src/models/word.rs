@@ -41,7 +41,7 @@ pub struct Example {
     id: Option<u32>,
 }
 
-pub async fn word() -> Result<Response> {
+pub async fn get_word() -> Result<Response> {
     info!("Sending Word of the Day");
     let wordnik_api = env::var("WORDNIK_API_KEY").expect("wordnik api key");
     let url = format!(

@@ -11,7 +11,7 @@ pub async fn word(ctx: &Context, msg: &Message) -> CommandResult {
     let dt = Utc::now().format("%B %d, %Y");
     let color = utils::COLORS.choose(&mut rand::thread_rng()).unwrap();
 
-    let Ok(res) = word::word().await else {
+    let Ok(res) = word::get_word().await else {
         msg.channel_id
             .say(&ctx.http, "had a problem parsing JSON!")
             .await?;
