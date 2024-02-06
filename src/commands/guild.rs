@@ -20,7 +20,7 @@ pub async fn get_guild(ctx: &Context, msg: &Message) -> CommandResult {
     };
     let mut contents = String::new();
     match file.read_to_string(&mut contents) {
-        Ok(_) => info!("Parse succesful"),
+        Ok(_) => info!("Parse successful"),
         Err(e) => {
             error!("Parse failed: {}", e);
             return Ok(());
@@ -29,7 +29,7 @@ pub async fn get_guild(ctx: &Context, msg: &Message) -> CommandResult {
     let config: Guilds = match serde_json::from_str(&contents) {
         Ok(res) => res,
         Err(e) => {
-            error!("Couldn't read json: {}", e);
+            error!("Couldn't read JSON: {}", e);
             return Ok(());
         }
     };
@@ -39,7 +39,7 @@ pub async fn get_guild(ctx: &Context, msg: &Message) -> CommandResult {
     config[1].test_update(&ctx.http).await?;
     config[0].test_update(&ctx.http).await?;
     msg.channel_id
-        .say(&ctx.http, "Read guilds succesfully")
+        .say(&ctx.http, "Read guilds successfully")
         .await?;
     Ok(())
 }
