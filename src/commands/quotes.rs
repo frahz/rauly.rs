@@ -3,7 +3,7 @@ use serenity::framework::standard::{macros::command, Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 struct Quote {
     a: String,
     q: String,

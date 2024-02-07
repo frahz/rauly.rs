@@ -15,6 +15,11 @@ impl TypeMapKey for VoiceHttpKey {
     type Value = HttpClient;
 }
 
+struct TrackInfo;
+impl TypeMapKey for TrackInfo {
+    type Value = (String, String);
+}
+
 #[command]
 #[only_in(guilds)]
 pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
@@ -128,7 +133,22 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
             YoutubeDl::new_search(http_client, song)
         };
 
-        handler.enqueue_input(source.clone().into()).await;
+        let handle = handler.enqueue_input(source.clone().into()).await;
+        if let Ok(metadata) = source.aux_metadata().await {
+            let url = match metadata.source_url {
+                Some(url) => url,
+                None => "https://en.wikipedia.org/wiki/HTTP_404".to_string(),
+            };
+            let title = match metadata.title {
+                Some(title) => title,
+                None => "Title".to_string(),
+            };
+            handle
+                .typemap()
+                .write()
+                .await
+                .insert::<TrackInfo>((title, url));
+        }
         let embed = song_embed(&mut source, handler.queue().len()).await;
 
         let builder = CreateMessage::new().embed(embed);
@@ -276,7 +296,7 @@ async fn skip(ctx: &Context, msg: &Message) -> CommandResult {
 
     Ok(())
 }
-//TODO: Send message with queue info
+
 #[command]
 #[only_in(guilds)]
 async fn info(ctx: &Context, msg: &Message) -> CommandResult {
@@ -287,16 +307,36 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
 
+    let footer = CreateEmbedFooter::new("rauly.rs");
+    let mut embed = CreateEmbed::new()
+        .colour(0xeb984e)
+        .title("Music Queue")
+        .footer(footer);
+
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
 
         let list = handler.queue().current_queue();
-        for track in list {
-            let metadata = get_metadata(&track).await;
-            info!("Artist: {} Title: {}", metadata.0, metadata.1);
+        for (i, track) in list.iter().take(10).enumerate() {
+            let metadata = get_metadata(track).await;
+            info!("Position: {}, Url: {} Title: {}", i, metadata.1, metadata.0);
+            if i == 0 {
+                embed = embed.field(
+                    "Now Playing:".to_string(),
+                    format!("[{}]({})", metadata.0, metadata.1),
+                    false,
+                );
+            } else {
+                embed = embed.field(
+                    String::new(),
+                    format!("**{}**. [{}]({})", i, metadata.0, metadata.1),
+                    false,
+                );
+            }
         }
 
-        check_msg(msg.channel_id.say(&ctx.http, "printing queue info").await);
+        let builder = CreateMessage::new().embed(embed);
+        check_msg(msg.channel_id.send_message(&ctx.http, builder).await);
     } else {
         check_msg(
             msg.channel_id
@@ -309,7 +349,11 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 async fn get_metadata(track_handle: &TrackHandle) -> (String, String) {
-    todo!()
+    let typemap = track_handle.typemap().read().await;
+    typemap
+        .get::<TrackInfo>()
+        .cloned()
+        .expect("This shouldn't be empty")
 }
 
 async fn get_http_client(ctx: &Context) -> HttpClient {
@@ -318,6 +362,7 @@ async fn get_http_client(ctx: &Context) -> HttpClient {
         .cloned()
         .expect("Guaranteed to exist in the typemap")
 }
+
 fn check_msg(result: SerenityResult<Message>) {
     if let Err(why) = result {
         error!("Error sending message: {:?}", why);
