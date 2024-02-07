@@ -4,7 +4,7 @@ use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use serenity::http::Http;
 use serenity::model::prelude::*;
-use tracing::{error, info};
+use tracing::info;
 
 pub type Guilds = Vec<Guild>;
 #[derive(Debug, Serialize, Deserialize)]
