@@ -7,7 +7,6 @@ use serenity::prelude::*;
 struct Quote {
     a: String,
     q: String,
-    h: String,
 }
 
 #[command]
