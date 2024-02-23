@@ -41,9 +41,7 @@
               src = ./.;
               hooks = {
                 rustfmt.enable = true;
-                /* clippy.enable = true; */
               };
-              /* settings.clippy.offline = false; */
             };
           };
           devShells.default = mkShell {
