@@ -1,7 +1,7 @@
 /target
 .env
 
-# lockfile
-Cargo.lock
-
 config.json
+
+result
+.pre-commit-config.yaml
