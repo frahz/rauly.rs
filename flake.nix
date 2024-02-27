@@ -83,7 +83,7 @@
             enable = mkEnableOption "rauly.rs discord bot";
             package = mkOption {
               type = types.package;
-              default = self.packages.default;
+              default = self.packages.${system}.default;
               description = ''
                 Package for rauly.rs discord bot
               '';
