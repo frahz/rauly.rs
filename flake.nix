@@ -74,6 +74,7 @@
       nixosModules.default = {
         config,
         lib,
+        ...
       }:
         with lib; let
           cfg = config.services.raulyrs;
