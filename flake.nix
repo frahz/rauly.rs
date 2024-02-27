@@ -27,9 +27,9 @@
     flake-utils.lib.eachDefaultSystem
     (
       system: let
-        overlays = [(import rust-overlay)];
         pkgs = import nixpkgs {
-          inherit system overlays;
+          inherit system;
+          overlays = [(import rust-overlay)];
         };
         cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
 
@@ -65,9 +65,11 @@
             inherit (self.checks.${system}.pre-commit-check) shellHook;
             inherit nativeBuildInputs buildInputs;
           };
-          nixosModules.default =
-            if system == "x86_64-linux"
-            then {config, lib}: with lib; let
+          nixosModules.default = {
+            config,
+            lib,
+          }:
+            with lib; let
               cfg = config.services.raulyrs;
             in {
               options.services.raulyrs = {
@@ -89,7 +91,7 @@
               config = mkIf cfg.enable {
                 systemd.services.raulyrs = {
                   description = "rauly.rs discord bot";
-                  wantedBy = [ "multi-user.target" ];
+                  wantedBy = ["multi-user.target"];
                   serviceConfig = {
                     Type = "Simple";
                     ExecStart = lib.getExe cfg.package;
@@ -97,8 +99,12 @@
                   };
                 };
               };
-            }
-            else {};
+            };
         }
-    );
+    )
+    // {
+      overlays.default = final: _: {
+        raulyrs = final.callPackage self.packages.${final.system}.default {};
+      };
+    };
 }
