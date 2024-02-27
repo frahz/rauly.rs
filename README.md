@@ -11,6 +11,23 @@ A general discord bot made for friends group discord server. Built with [serenit
 - Do some simple math(got it from the examples...)
 - Send daily/random quote.
 
+## Setup
+
+### Prerequisites
+
+- [Nix](https://nixos.org/download)
+
+### Dev Environment
+
+To start the dev environment run the following command:
+```bash
+nix develop
+```
+To build and run:
+```bash
+cargo run
+```
+
 ## Features to be implemented
 
 - The bot sends a the Word of the Day daily, at a certain specified time.
