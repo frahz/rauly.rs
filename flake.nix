@@ -101,7 +101,7 @@
               description = "rauly.rs discord bot";
               wantedBy = ["multi-user.target"];
               serviceConfig = {
-                Type = "Simple";
+                Type = "simple";
                 ExecStart = lib.getExe cfg.package;
                 EnvironmentFile = cfg.environmentFile;
               };
