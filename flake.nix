@@ -74,6 +74,7 @@
       nixosModules.default = {
         config,
         lib,
+        pkgs,
         ...
       }:
         with lib; let
@@ -83,7 +84,7 @@
             enable = mkEnableOption "rauly.rs discord bot";
             package = mkOption {
               type = types.package;
-              default = self.packages.${system}.default;
+              default = pkgs.raulyrs;
               description = ''
                 Package for rauly.rs discord bot
               '';
