@@ -60,6 +60,13 @@
                 "songbird-0.4.0" = "sha256-lrf19DxuuzGcqLLLfMfI/dC/TdjKMMgxPZXgPxoxBsA=";
               };
             };
+
+            meta = with lib; {
+              description = "rauly.rs discord bot";
+              homepage = "https://github.com/frahz/rauly.rs";
+              licenses = licenses.mit;
+              mainProgram = "raulyrs";
+            };
           };
           devShells.default = mkShell {
             inherit (self.checks.${system}.pre-commit-check) shellHook;
