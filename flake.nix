@@ -107,11 +107,22 @@
             systemd.services.raulyrs = {
               description = "rauly.rs discord bot";
               wantedBy = ["multi-user.target"];
+              path = [ pkgs.yt-dlp ];
               serviceConfig = {
                 Type = "simple";
+                User = "raulyrs";
                 ExecStart = lib.getExe cfg.package;
                 EnvironmentFile = cfg.environmentFile;
               };
+            };
+
+            users = {
+              users.raulyrs = {
+                description = "rauly.rs service user";
+                isSystemUser = true;
+                group = "raulyrs";
+              };
+              groups.raulyrs = {};
             };
           };
         };
