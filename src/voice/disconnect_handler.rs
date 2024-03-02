@@ -1,6 +1,5 @@
 use once_cell::sync::Lazy;
 use serenity::async_trait;
-use serenity::http::Http;
 use serenity::model::prelude::*;
 use serenity::prelude::RwLock;
 use serenity::prelude::*;
@@ -14,17 +13,12 @@ const TIMEOUT_SECS: u64 = 420;
 #[derive(Clone)]
 pub struct ChannelDisconnect {
     manager: Arc<Songbird>,
-    http: Arc<Http>,
     guild_id: GuildId,
 }
 
 impl ChannelDisconnect {
-    pub fn new(manager: Arc<Songbird>, http: Arc<Http>, guild_id: GuildId) -> Self {
-        Self {
-            manager,
-            http,
-            guild_id,
-        }
+    pub fn new(manager: Arc<Songbird>, guild_id: GuildId) -> Self {
+        Self { manager, guild_id }
     }
 
     pub async fn register_handler(&self, handler_lock: &Arc<Mutex<Call>>) {

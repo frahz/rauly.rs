@@ -120,7 +120,7 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     }
 
     if let Some(handler_lock) = manager.get(guild_id) {
-        let _dch = ChannelDisconnect::new(manager.clone(), ctx.http.clone(), guild_id)
+        let _dch = ChannelDisconnect::new(manager.clone(), guild_id)
             .register_handler(&handler_lock)
             .await;
         let mut handler = handler_lock.lock().await;

@@ -54,12 +54,7 @@
             inherit nativeBuildInputs buildInputs;
             inherit (cargoToml.package) name version;
             src = lib.cleanSource ./.;
-            cargoLock = {
-              lockFile = ./Cargo.lock;
-              outputHashes = {
-                "songbird-0.4.0" = "sha256-lrf19DxuuzGcqLLLfMfI/dC/TdjKMMgxPZXgPxoxBsA=";
-              };
-            };
+            cargoLock.lockFile = ./Cargo.lock;
 
             meta = with lib; {
               description = "rauly.rs discord bot";
