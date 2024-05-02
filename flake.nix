@@ -50,18 +50,21 @@
               };
             };
           };
-          packages.default = rustPlatform.buildRustPackage {
-            inherit nativeBuildInputs buildInputs;
-            inherit (cargoToml.package) name version;
-            src = lib.cleanSource ./.;
-            cargoLock.lockFile = ./Cargo.lock;
+          packages = {
+            default = rustPlatform.buildRustPackage {
+              inherit nativeBuildInputs buildInputs;
+              inherit (cargoToml.package) name version;
+              src = lib.cleanSource ./.;
+              cargoLock.lockFile = ./Cargo.lock;
 
-            meta = with lib; {
-              description = "rauly.rs discord bot";
-              homepage = "https://github.com/frahz/rauly.rs";
-              licenses = licenses.mit;
-              mainProgram = "raulyrs";
+              meta = with lib; {
+                description = "rauly.rs discord bot";
+                homepage = "https://github.com/frahz/rauly.rs";
+                licenses = licenses.mit;
+                mainProgram = "raulyrs";
+              };
             };
+            raulyrs = self.packages.${system}.default;
           };
           devShells.default = mkShell {
             inherit (self.checks.${system}.pre-commit-check) shellHook;
@@ -73,9 +76,6 @@
       overlays.default = final: _: {
         raulyrs = final.callPackage self.packages.${final.system}.default {};
       };
-      nixosModules.default = {...}: {
-        imports =  [./nix/module.nix];
-        nixpkgs.overlays = [self.overlays.default];
-      };
+      nixosModules.default = import ./nix/module.nix self;
     };
 }

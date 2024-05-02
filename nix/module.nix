@@ -1,4 +1,4 @@
-{
+self: {
   config,
   lib,
   pkgs,
@@ -11,7 +11,7 @@ in {
     enable = mkEnableOption "rauly.rs discord bot";
     package = mkOption {
       type = types.package;
-      default = pkgs.raulyrs;
+      default = self.packages.${pkgs.system}.raulyrs;
       description = ''
         Package for rauly.rs discord bot
       '';
@@ -26,7 +26,7 @@ in {
   config = mkIf cfg.enable {
     systemd.services.raulyrs = {
       description = "rauly.rs discord bot";
-      after = [ "network.target" ];
+      after = ["network.target"];
       wantedBy = ["multi-user.target"];
       path = [pkgs.yt-dlp];
       serviceConfig = {
