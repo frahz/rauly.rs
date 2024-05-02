@@ -73,6 +73,9 @@
       overlays.default = final: _: {
         raulyrs = final.callPackage self.packages.${final.system}.default {};
       };
-      nixosModules.default = import ./nix/module.nix;
+      nixosModules.default = {...}: {
+        imports =  [./nix/module.nix];
+        nixpkgs.overlays = [self.overlays.default];
+      };
     };
 }
