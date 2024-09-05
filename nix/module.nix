@@ -34,6 +34,7 @@ in {
         User = "raulyrs";
         ExecStart = lib.getExe cfg.package;
         EnvironmentFile = cfg.environmentFile;
+        Restart = "on-failure";
       };
     };
 
