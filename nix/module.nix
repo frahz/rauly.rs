@@ -26,7 +26,8 @@ in {
   config = mkIf cfg.enable {
     systemd.services.raulyrs = {
       description = "rauly.rs discord bot";
-      after = ["network.target"];
+      after = ["network-online.target"];
+      wants = ["network-online.target"];
       wantedBy = ["multi-user.target"];
       path = [pkgs.yt-dlp];
       serviceConfig = {
