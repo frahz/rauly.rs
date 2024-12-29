@@ -3,28 +3,19 @@ mod models;
 mod utils;
 mod voice;
 
-use std::{collections::HashSet, env, sync::Arc};
-
+use crate::voice::cmds::VoiceHttpKey;
+use reqwest::Client as HttpClient;
 use serenity::{
     all::{GuildId, RoleId},
     async_trait,
-    framework::{
-        standard::{macros::group, Configuration},
-        StandardFramework,
-    },
     gateway::ShardManager,
     http::Http,
     model::{event::ResumedEvent, gateway::Ready, guild::Member},
     prelude::*,
 };
-
-use reqwest::Client as HttpClient;
-
 use songbird::SerenityInit;
+use std::{collections::HashSet, env, sync::Arc};
 use tracing::{error, info};
-
-use crate::commands::{guild::*, math::*, quotes::*, wotd::*};
-use crate::voice::cmds::*;
 
 pub struct ShardManagerContainer;
 
@@ -32,19 +23,23 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<ShardManager>;
 }
 
+struct Data {} // User data, which is stored and accessible in all command invocations
+type Error = Box<dyn std::error::Error + Send + Sync>;
+type Context<'a> = poise::Context<'a, Data, Error>;
+
 struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn ready(&self, _: serenity::client::Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
     }
 
-    async fn resume(&self, _: Context, _: ResumedEvent) {
+    async fn resume(&self, _: serenity::client::Context, _: ResumedEvent) {
         info!("Resumed");
     }
 
-    async fn guild_member_addition(&self, ctx: Context, mut _member: Member) {
+    async fn guild_member_addition(&self, ctx: serenity::client::Context, mut _member: Member) {
         let guild_id = env::var("GUILD_ID")
             .expect("Guild ID")
             .parse::<GuildId>()
@@ -75,21 +70,11 @@ impl EventHandler for Handler {
     }
 }
 
-#[group]
-#[commands(multiply, quote, word, get_guild)]
-#[sub_groups(voice)]
-struct General;
-
-#[group]
-#[prefix = "m"]
-#[commands(join, leave, play, pause, resume, skip, stop, info)]
-struct Voice;
-
 #[tokio::main]
 async fn main() {
     // This will load the environment variables located at `./.env`, relative to
     // the CWD. See `./.env.example` for an example on how to structure this.
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // Initialize the logger to use environment variables.
     //
@@ -115,8 +100,29 @@ async fn main() {
     };
 
     // Create the framework
-    let framework = StandardFramework::new().group(&GENERAL_GROUP);
-    framework.configure(Configuration::new().owners(owners).prefix("~"));
+    let framework = poise::Framework::builder()
+        .options(poise::FrameworkOptions {
+            commands: vec![
+                commands::quotes::quote(),
+                commands::math::multiply(),
+                commands::wotd::word(),
+                commands::guild::get_guild(),
+                voice::cmds::voice(),
+            ],
+            prefix_options: poise::PrefixFrameworkOptions {
+                prefix: Some("~".into()),
+                ..Default::default()
+            },
+            owners,
+            ..Default::default()
+        })
+        .setup(|ctx, _, framework| {
+            Box::pin(async move {
+                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                Ok(Data {})
+            })
+        })
+        .build();
 
     let intents = GatewayIntents::non_privileged()
         | GatewayIntents::MESSAGE_CONTENT

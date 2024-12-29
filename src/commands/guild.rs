@@ -1,15 +1,11 @@
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use crate::models::guild::*;
+use crate::{Context, Error};
 use std::fs::File;
 use std::io::Read;
 use tracing::{error, info};
 
-use crate::models::guild::*;
-
-#[command]
-#[aliases("gg")]
-pub async fn get_guild(ctx: &Context, msg: &Message) -> CommandResult {
+#[poise::command(prefix_command, aliases("gg"))]
+pub async fn get_guild(ctx: Context<'_>) -> Result<(), Error> {
     info!("Getting guilds");
     let mut file = match File::open("config.json") {
         Ok(f) => f,
@@ -36,10 +32,8 @@ pub async fn get_guild(ctx: &Context, msg: &Message) -> CommandResult {
     for guild in &config {
         info!("guild: {:#?}", guild);
     }
-    config[1].test_update(&ctx.http).await?;
-    config[0].test_update(&ctx.http).await?;
-    msg.channel_id
-        .say(&ctx.http, "Read guilds successfully")
-        .await?;
+    config[0].test_update(ctx.http()).await?;
+    config[1].test_update(ctx.http()).await?;
+    ctx.say("Read Guilds successfully").await?;
     Ok(())
 }

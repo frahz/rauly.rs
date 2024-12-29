@@ -1,20 +1,15 @@
-use crate::{models::word, utils};
+use crate::{models::word, utils, Context, Error};
 use chrono::prelude::*;
 use rand::prelude::*;
-use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 
-#[command]
-pub async fn word(ctx: &Context, msg: &Message) -> CommandResult {
+#[poise::command(prefix_command)]
+pub async fn word(ctx: Context<'_>) -> Result<(), Error> {
     let dt = Utc::now().format("%B %d, %Y");
     let color = utils::COLORS.choose(&mut rand::thread_rng()).unwrap();
 
     let Ok(res) = word::get_word().await else {
-        msg.channel_id
-            .say(&ctx.http, "had a problem parsing JSON!")
-            .await?;
+        ctx.say("Had a problem parsing JSON!").await?;
         return Ok(());
     };
 
@@ -35,8 +30,8 @@ pub async fn word(ctx: &Context, msg: &Message) -> CommandResult {
         .field("Example", example, false)
         .field("Note", res.note, false)
         .footer(footer);
-    let builder = CreateMessage::new().embed(embed);
-    msg.channel_id.send_message(&ctx.http, builder).await?;
+    let msg = poise::CreateReply::default().embed(embed);
+    ctx.send(msg).await?;
 
     Ok(())
 }
