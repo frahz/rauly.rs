@@ -1,13 +1,15 @@
-use once_cell::sync::Lazy;
 use serenity::async_trait;
 use serenity::model::prelude::*;
 use serenity::prelude::RwLock;
 use serenity::prelude::*;
 use songbird::{Call, Event, EventContext, EventHandler, Songbird};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 use tracing::info;
 
-static HANDLER_ADDED: Lazy<RwLock<bool>> = Lazy::new(|| RwLock::new(false));
+static HANDLER_ADDED: LazyLock<RwLock<bool>> = LazyLock::new(|| RwLock::new(false));
 const TIMEOUT_SECS: u64 = 420;
 
 #[derive(Clone)]
