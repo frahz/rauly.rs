@@ -1,10 +1,9 @@
 use crate::voice::disconnect_handler::ChannelDisconnect;
+use crate::{Context, Error};
+use poise::ReplyHandle;
 use reqwest::Client as HttpClient;
-use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
-use serenity::framework::standard::{macros::command, Args, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
-use serenity::Result as SerenityResult;
+use serenity::builder::{CreateEmbed, CreateEmbedFooter};
+use serenity::prelude::TypeMapKey;
 use songbird::input::Compose;
 use songbird::{input::YoutubeDl, tracks::TrackHandle};
 use tracing::{error, info};
@@ -20,15 +19,14 @@ impl TypeMapKey for TrackInfo {
     type Value = (String, String);
 }
 
-#[command]
-#[only_in(guilds)]
-pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
+#[poise::command(prefix_command, guild_only)]
+pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
     let (guild_id, channel_id) = {
-        let guild = msg.guild(&ctx.cache).unwrap();
+        let guild = ctx.guild().unwrap();
 
         let channel_id = guild
             .voice_states
-            .get(&msg.author.id)
+            .get(&ctx.author().id)
             .and_then(|voice_state| voice_state.channel_id);
         (guild.id, channel_id)
     };
@@ -36,12 +34,12 @@ pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     let connect_to = match channel_id {
         Some(channel) => channel,
         None => {
-            check_msg(msg.reply(ctx, "Not in a voice channel").await);
+            check_msg(ctx.reply("Not in a voice channel").await);
             return Ok(());
         }
     };
 
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
@@ -51,12 +49,11 @@ pub async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[command]
-#[only_in(guilds)]
-async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
+#[poise::command(prefix_command, guild_only)]
+async fn leave(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
@@ -64,11 +61,7 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
 
     if has_handler {
         if let Err(e) = manager.remove(guild_id).await {
-            check_msg(
-                msg.channel_id
-                    .say(&ctx.http, format!("Failed: {:?}", e))
-                    .await,
-            );
+            check_msg(ctx.say(format!("Failed: {:?}", e)).await);
         }
         if let Some(handler_lock) = manager.get(guild_id) {
             let mut handler = handler_lock.lock().await;
@@ -76,41 +69,38 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
             info!("removing handlers");
         }
 
-        check_msg(msg.channel_id.say(&ctx.http, "Left voice channel").await);
+        check_msg(ctx.say("Left voice channel").await);
     } else {
-        check_msg(msg.reply(ctx, "Not in a voice channel").await);
+        check_msg(ctx.reply("Not in a voice channel").await);
     }
 
     Ok(())
 }
 
-#[command]
-#[only_in(guilds)]
-#[aliases("p")]
-async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let song = args.rest().to_owned();
+#[poise::command(prefix_command, guild_only, aliases("p"))]
+async fn play(ctx: Context<'_>, song: String) -> Result<(), Error> {
     let is_url = song.starts_with("http");
 
-    let guild_id = msg.guild_id.unwrap();
+    let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
 
     if manager.get(guild_id).is_none() {
         let channel_id = {
-            let guild = msg.guild(&ctx.cache).unwrap();
+            let guild = ctx.guild().unwrap();
             guild
                 .voice_states
-                .get(&msg.author.id)
+                .get(&ctx.author().id)
                 .and_then(|voice_state| voice_state.channel_id)
         };
 
         let connect_to = match channel_id {
             Some(channel) => channel,
             None => {
-                check_msg(msg.reply(ctx, "Not in a voice channel").await);
+                check_msg(ctx.reply("Not in a voice channel").await);
 
                 return Ok(());
             }
@@ -126,7 +116,7 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
         let mut handler = handler_lock.lock().await;
 
         // TODO: make this faster with less cloning
-        let http_client = get_http_client(ctx).await;
+        let http_client = get_http_client(&ctx).await;
         let mut source = if is_url {
             YoutubeDl::new(http_client, song)
         } else {
@@ -151,25 +141,20 @@ async fn play(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
         }
         let embed = song_embed(&mut source, handler.queue().len()).await;
 
-        let builder = CreateMessage::new().embed(embed);
-        check_msg(msg.channel_id.send_message(&ctx.http, builder).await);
+        let msg = poise::CreateReply::default().embed(embed);
+        check_msg(ctx.send(msg).await);
     } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
+        check_msg(ctx.say("Not in a voice channel to play in").await);
     }
 
     Ok(())
 }
 
-#[command]
-#[only_in(guilds)]
-async fn pause(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
+#[poise::command(prefix_command, guild_only)]
+async fn pause(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
@@ -186,24 +171,19 @@ async fn pause(ctx: &Context, msg: &Message) -> CommandResult {
             }
         };
 
-        check_msg(msg.channel_id.say(&ctx.http, "Paused song").await);
+        check_msg(ctx.say("Paused song").await);
     } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
+        check_msg(ctx.say("Not in a voice channel to play in").await);
     }
 
     Ok(())
 }
 
-#[command]
-#[only_in(guilds)]
-async fn resume(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
+#[poise::command(prefix_command, guild_only)]
+async fn resume(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
@@ -220,24 +200,19 @@ async fn resume(ctx: &Context, msg: &Message) -> CommandResult {
             }
         };
 
-        check_msg(msg.channel_id.say(&ctx.http, "resume song").await);
+        check_msg(ctx.say("resume song").await);
     } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
+        check_msg(ctx.say("Not in a voice channel to play in").await);
     }
 
     Ok(())
 }
 
-#[command]
-#[only_in(guilds)]
-async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
+#[poise::command(prefix_command, guild_only)]
+async fn stop(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
@@ -247,28 +222,19 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
 
         handler.queue().stop();
 
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "stopping song and clearing queue")
-                .await,
-        );
+        check_msg(ctx.say("stopping song and clearing queue").await);
     } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
+        check_msg(ctx.say("Not in a voice channel to play in").await);
     }
 
     Ok(())
 }
 
-#[command]
-#[only_in(guilds)]
-async fn skip(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
+#[poise::command(prefix_command, guild_only)]
+async fn skip(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
@@ -285,24 +251,19 @@ async fn skip(ctx: &Context, msg: &Message) -> CommandResult {
             }
         };
 
-        check_msg(msg.channel_id.say(&ctx.http, "skipped song").await);
+        check_msg(ctx.say("skipped song").await);
     } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
+        check_msg(ctx.say("Not in a voice channel to play in").await);
     }
 
     Ok(())
 }
 
-#[command]
-#[only_in(guilds)]
-async fn info(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
+#[poise::command(prefix_command, guild_only)]
+async fn info(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
@@ -335,16 +296,21 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
             }
         }
 
-        let builder = CreateMessage::new().embed(embed);
-        check_msg(msg.channel_id.send_message(&ctx.http, builder).await);
+        let msg = poise::CreateReply::default().embed(embed);
+        check_msg(ctx.send(msg).await);
     } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
+        check_msg(ctx.say("Not in a voice channel to play in").await);
     }
 
+    Ok(())
+}
+
+#[poise::command(
+    prefix_command,
+    aliases("m"),
+    subcommands("join", "leave", "play", "pause", "resume", "stop", "skip", "info")
+)]
+pub async fn voice(_: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
@@ -356,14 +322,14 @@ async fn get_metadata(track_handle: &TrackHandle) -> (String, String) {
         .expect("This shouldn't be empty")
 }
 
-async fn get_http_client(ctx: &Context) -> HttpClient {
-    let data = ctx.data.read().await;
+async fn get_http_client(ctx: &Context<'_>) -> HttpClient {
+    let data = ctx.serenity_context().data.read().await;
     data.get::<VoiceHttpKey>()
         .cloned()
         .expect("Guaranteed to exist in the typemap")
 }
 
-fn check_msg(result: SerenityResult<Message>) {
+fn check_msg(result: Result<ReplyHandle, serenity::Error>) {
     if let Err(why) = result {
         error!("Error sending message: {:?}", why);
     }
