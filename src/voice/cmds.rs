@@ -4,8 +4,10 @@ use poise::ReplyHandle;
 use reqwest::Client as HttpClient;
 use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 use serenity::prelude::TypeMapKey;
-use songbird::input::Compose;
-use songbird::{input::YoutubeDl, tracks::TrackHandle};
+use songbird::{
+    input::{Compose, YoutubeDl},
+    tracks::TrackHandle,
+};
 use tracing::{error, info};
 
 pub struct VoiceHttpKey;
@@ -17,6 +19,15 @@ impl TypeMapKey for VoiceHttpKey {
 struct TrackInfo;
 impl TypeMapKey for TrackInfo {
     type Value = (String, String);
+}
+
+#[poise::command(
+    prefix_command,
+    aliases("m"),
+    subcommands("join", "leave", "play", "pause", "resume", "stop", "skip", "info")
+)]
+pub async fn voice_cmds(_: Context<'_>) -> Result<(), Error> {
+    Ok(())
 }
 
 #[poise::command(prefix_command, guild_only)]
@@ -302,15 +313,6 @@ async fn info(ctx: Context<'_>) -> Result<(), Error> {
         check_msg(ctx.say("Not in a voice channel to play in").await);
     }
 
-    Ok(())
-}
-
-#[poise::command(
-    prefix_command,
-    aliases("m"),
-    subcommands("join", "leave", "play", "pause", "resume", "stop", "skip", "info")
-)]
-pub async fn voice(_: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 

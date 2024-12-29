@@ -107,7 +107,7 @@ async fn main() {
                 commands::math::multiply(),
                 commands::wotd::word(),
                 commands::guild::get_guild(),
-                voice::cmds::voice(),
+                voice::cmds::voice_cmds(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("~".into()),
