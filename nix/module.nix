@@ -19,7 +19,9 @@ in {
     environmentFile = mkOption {
       type = types.path;
       description = ''
-        Path containing the Bot's API keys
+        Path containing the Bot's API keys.
+        The following keys need to be present:
+        DISCORD_TOKEN and WORDNIK_API_KEY
       '';
     };
   };
