@@ -9,12 +9,11 @@ use serenity::{
     all::{GuildId, RoleId},
     async_trait,
     gateway::ShardManager,
-    http::Http,
     model::{event::ResumedEvent, gateway::Ready, guild::Member},
     prelude::*,
 };
 use songbird::SerenityInit;
-use std::{collections::HashSet, env, sync::Arc};
+use std::{env, sync::Arc};
 use tracing::{error, info};
 
 pub struct ShardManagerContainer;
@@ -84,21 +83,6 @@ async fn main() {
 
     let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
-    let http = Http::new(&token);
-
-    // We will fetch your bot's owners and id
-    let (owners, _bot_id) = match http.get_current_application_info().await {
-        Ok(info) => {
-            let mut owners = HashSet::new();
-            if let Some(owner) = &info.owner {
-                owners.insert(owner.id);
-            }
-
-            (owners, info.id)
-        }
-        Err(why) => panic!("Could not access application info: {:?}", why),
-    };
-
     // Create the framework
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -113,7 +97,6 @@ async fn main() {
                 prefix: Some("~".into()),
                 ..Default::default()
             },
-            owners,
             ..Default::default()
         })
         .setup(|ctx, _, framework| {
