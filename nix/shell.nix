@@ -1,9 +1,5 @@
-{
-  pkgs,
-  shellHook,
-}:
+{pkgs}:
 pkgs.mkShell {
-  inherit shellHook;
   name = "raulyrs";
   nativeBuildInputs = with pkgs; [pkg-config];
   buildInputs = with pkgs; [
