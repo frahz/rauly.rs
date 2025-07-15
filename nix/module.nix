@@ -1,12 +1,15 @@
-self: {
+self:
+{
   config,
   lib,
   pkgs,
   ...
 }:
-with lib; let
+with lib;
+let
   cfg = config.services.raulyrs;
-in {
+in
+{
   options.services.raulyrs = {
     enable = mkEnableOption "rauly.rs discord bot";
     package = mkOption {
@@ -28,10 +31,10 @@ in {
   config = mkIf cfg.enable {
     systemd.services.raulyrs = {
       description = "rauly.rs discord bot";
-      after = ["network-online.target"];
-      wants = ["network-online.target"];
-      wantedBy = ["multi-user.target"];
-      path = [pkgs.yt-dlp];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      wantedBy = [ "multi-user.target" ];
+      path = [ pkgs.yt-dlp ];
       serviceConfig = {
         Type = "simple";
         User = "raulyrs";
@@ -47,7 +50,7 @@ in {
         isSystemUser = true;
         group = "raulyrs";
       };
-      groups.raulyrs = {};
+      groups.raulyrs = { };
     };
   };
 }
