@@ -1,25 +1,25 @@
 use crate::{Context, Error};
 use serde::Deserialize;
 
+#[derive(poise::ChoiceParameter)]
+pub enum QuoteChoice {
+    #[name = "Today's Quote"]
+    Today,
+    #[name = "Random Quote"]
+    Random,
+}
+
 #[derive(Deserialize)]
 struct Quote {
     a: String,
     q: String,
 }
 
-#[poise::command(prefix_command, aliases("q"))]
-pub async fn quote(ctx: Context<'_>, choice: String) -> Result<(), Error> {
-    let url = match choice.as_str() {
-        "r" | "random" => "https://zenquotes.io/api/random",
-        "t" | "today" => "https://zenquotes.io/api/today",
-        s => {
-            ctx.say(format!(
-                "**Invalid Argument Passed**: {}\nPlease pass one of `today` or `random`",
-                s
-            ))
-            .await?;
-            return Ok(());
-        }
+#[poise::command(slash_command)]
+pub async fn quote(ctx: Context<'_>, choice: QuoteChoice) -> Result<(), Error> {
+    let url = match choice {
+        QuoteChoice::Random => "https://zenquotes.io/api/random",
+        QuoteChoice::Today => "https://zenquotes.io/api/today",
     };
     let res = reqwest::get(url).await?.json::<Vec<Quote>>().await?;
 

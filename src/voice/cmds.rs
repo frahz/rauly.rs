@@ -8,7 +8,7 @@ use songbird::{
     input::{Compose, YoutubeDl},
     tracks::TrackHandle,
 };
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 pub struct VoiceHttpKey;
 
@@ -22,15 +22,15 @@ impl TypeMapKey for TrackInfo {
 }
 
 #[poise::command(
-    prefix_command,
-    aliases("m"),
+    slash_command,
     subcommands("join", "leave", "play", "pause", "resume", "stop", "skip", "info")
 )]
-pub async fn voice_cmds(_: Context<'_>) -> Result<(), Error> {
+pub async fn voice(_: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[poise::command(prefix_command, guild_only)]
+/// Make the bot join your current voice channel
+#[poise::command(slash_command, guild_only)]
 pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
     let (guild_id, channel_id) = {
         let guild = ctx.guild().unwrap();
@@ -45,7 +45,7 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
     let connect_to = match channel_id {
         Some(channel) => channel,
         None => {
-            check_msg(ctx.reply("Not in a voice channel").await);
+            check_msg(ctx.reply("Not in a voice channel.").await);
             return Ok(());
         }
     };
@@ -60,7 +60,8 @@ pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[poise::command(prefix_command, guild_only)]
+/// Make the bot leave its current voice channel
+#[poise::command(slash_command, guild_only)]
 async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
@@ -82,14 +83,17 @@ async fn leave(ctx: Context<'_>) -> Result<(), Error> {
 
         check_msg(ctx.say("Left voice channel").await);
     } else {
-        check_msg(ctx.reply("Not in a voice channel").await);
+        check_msg(ctx.reply("Not in a voice channel.").await);
     }
 
     Ok(())
 }
 
-#[poise::command(prefix_command, guild_only, aliases("p"))]
+/// Play an audio track by providing a link or search query
+#[poise::command(slash_command, guild_only)]
 async fn play(ctx: Context<'_>, song: String) -> Result<(), Error> {
+    ctx.defer().await?;
+
     let is_url = song.starts_with("http");
 
     let guild_id = ctx.guild_id().unwrap();
@@ -111,7 +115,7 @@ async fn play(ctx: Context<'_>, song: String) -> Result<(), Error> {
         let connect_to = match channel_id {
             Some(channel) => channel,
             None => {
-                check_msg(ctx.reply("Not in a voice channel").await);
+                check_msg(ctx.reply("Not in a voice channel.").await);
 
                 return Ok(());
             }
@@ -134,8 +138,10 @@ async fn play(ctx: Context<'_>, song: String) -> Result<(), Error> {
             YoutubeDl::new_search(http_client, song)
         };
 
+        debug!("Source: {source:?}");
         let handle = handler.enqueue_input(source.clone().into()).await;
         if let Ok(metadata) = source.aux_metadata().await {
+            debug!("metadata: {metadata:?}");
             let url = match metadata.source_url {
                 Some(url) => url,
                 None => "https://en.wikipedia.org/wiki/HTTP_404".to_string(),
@@ -155,13 +161,14 @@ async fn play(ctx: Context<'_>, song: String) -> Result<(), Error> {
         let msg = poise::CreateReply::default().embed(embed);
         check_msg(ctx.send(msg).await);
     } else {
-        check_msg(ctx.say("Not in a voice channel to play in").await);
+        check_msg(ctx.say("Not in a voice channel.").await);
     }
 
     Ok(())
 }
 
-#[poise::command(prefix_command, guild_only)]
+/// Pauses the current audio track
+#[poise::command(slash_command, guild_only)]
 async fn pause(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
@@ -184,13 +191,14 @@ async fn pause(ctx: Context<'_>) -> Result<(), Error> {
 
         check_msg(ctx.say("Paused song").await);
     } else {
-        check_msg(ctx.say("Not in a voice channel to play in").await);
+        check_msg(ctx.say("Not in a voice channel.").await);
     }
 
     Ok(())
 }
 
-#[poise::command(prefix_command, guild_only)]
+/// Resumes the current audio track
+#[poise::command(slash_command, guild_only)]
 async fn resume(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
@@ -213,13 +221,14 @@ async fn resume(ctx: Context<'_>) -> Result<(), Error> {
 
         check_msg(ctx.say("resume song").await);
     } else {
-        check_msg(ctx.say("Not in a voice channel to play in").await);
+        check_msg(ctx.say("Not in a voice channel.").await);
     }
 
     Ok(())
 }
 
-#[poise::command(prefix_command, guild_only)]
+/// Stops the song and clears the queue
+#[poise::command(slash_command, guild_only)]
 async fn stop(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
@@ -235,13 +244,14 @@ async fn stop(ctx: Context<'_>) -> Result<(), Error> {
 
         check_msg(ctx.say("stopping song and clearing queue").await);
     } else {
-        check_msg(ctx.say("Not in a voice channel to play in").await);
+        check_msg(ctx.say("Not in a voice channel.").await);
     }
 
     Ok(())
 }
 
-#[poise::command(prefix_command, guild_only)]
+/// Skips the current audio track
+#[poise::command(slash_command, guild_only)]
 async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
@@ -264,13 +274,14 @@ async fn skip(ctx: Context<'_>) -> Result<(), Error> {
 
         check_msg(ctx.say("skipped song").await);
     } else {
-        check_msg(ctx.say("Not in a voice channel to play in").await);
+        check_msg(ctx.say("Not in a voice channel.").await);
     }
 
     Ok(())
 }
 
-#[poise::command(prefix_command, guild_only)]
+/// Display a list of the current audio tracks
+#[poise::command(slash_command, guild_only)]
 async fn info(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
@@ -310,7 +321,7 @@ async fn info(ctx: Context<'_>) -> Result<(), Error> {
         let msg = poise::CreateReply::default().embed(embed);
         check_msg(ctx.send(msg).await);
     } else {
-        check_msg(ctx.say("Not in a voice channel to play in").await);
+        check_msg(ctx.say("Not in a voice channel.").await);
     }
 
     Ok(())
@@ -341,6 +352,7 @@ async fn song_embed(current_track: &mut impl Compose, postion: usize) -> CreateE
     let footer = CreateEmbedFooter::new("rauly.rs");
     let mut embed = CreateEmbed::new().colour(0xeb984e);
     if let Ok(metadata) = current_track.aux_metadata().await {
+        info!("metadata: {metadata:?}");
         if let Some(title) = metadata.title {
             embed = embed.title(format!("rauly.rs | {}", title));
         }

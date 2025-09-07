@@ -23,7 +23,7 @@ version = "0.4.6"
 features = ["builtin-queue"]
 
 [dependencies.symphonia]
-version = "0.5.4"
+version = "0.5"
 features = ["aac", "mp3", "isomp4", "alac"]
 
 [dependencies.tokio]

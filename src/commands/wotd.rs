@@ -3,7 +3,10 @@ use chrono::prelude::*;
 use rand::prelude::*;
 use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 
-#[poise::command(prefix_command)]
+#[poise::command(
+    slash_command,
+    description_localized("en-US", "Displays the Word of the Day")
+)]
 pub async fn word(ctx: Context<'_>) -> Result<(), Error> {
     let dt = Utc::now().format("%B %d, %Y");
     let color = utils::COLORS.choose(&mut rand::thread_rng()).unwrap();
