@@ -7,7 +7,9 @@ use serenity::prelude::TypeMapKey;
 use songbird::{
     input::{Compose, YoutubeDl},
     tracks::TrackHandle,
+    Songbird,
 };
+use std::sync::Arc;
 use tracing::{debug, error, info};
 
 pub struct VoiceHttpKey;
@@ -32,30 +34,16 @@ pub async fn voice(_: Context<'_>) -> Result<(), Error> {
 /// Make the bot join your current voice channel
 #[poise::command(slash_command, guild_only)]
 pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
-    let (guild_id, channel_id) = {
-        let guild = ctx.guild().unwrap();
-
-        let channel_id = guild
-            .voice_states
-            .get(&ctx.author().id)
-            .and_then(|voice_state| voice_state.channel_id);
-        (guild.id, channel_id)
-    };
-
-    let connect_to = match channel_id {
-        Some(channel) => channel,
-        None => {
-            check_msg(ctx.reply("Not in a voice channel.").await);
-            return Ok(());
-        }
-    };
-
     let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
 
-    let _handler = manager.join(guild_id, connect_to).await;
+    if let Err(why) = join_vc(ctx, manager).await {
+        check_msg(ctx.reply(why).await);
+    } else {
+        check_msg(ctx.reply("Joined Voice Channel.").await);
+    }
 
     Ok(())
 }
@@ -81,7 +69,7 @@ async fn leave(ctx: Context<'_>) -> Result<(), Error> {
             info!("removing handlers");
         }
 
-        check_msg(ctx.say("Left voice channel").await);
+        check_msg(ctx.say("Left Voice Channel.").await);
     } else {
         check_msg(ctx.reply("Not in a voice channel.").await);
     }
@@ -94,34 +82,17 @@ async fn leave(ctx: Context<'_>) -> Result<(), Error> {
 async fn play(ctx: Context<'_>, song: String) -> Result<(), Error> {
     ctx.defer().await?;
 
-    let is_url = song.starts_with("http");
-
-    let guild_id = ctx.guild_id().unwrap();
-
     let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
 
+    let guild_id = ctx.guild_id().unwrap();
+
     if manager.get(guild_id).is_none() {
-        let channel_id = {
-            let guild = ctx.guild().unwrap();
-            guild
-                .voice_states
-                .get(&ctx.author().id)
-                .and_then(|voice_state| voice_state.channel_id)
-        };
-
-        let connect_to = match channel_id {
-            Some(channel) => channel,
-            None => {
-                check_msg(ctx.reply("Not in a voice channel.").await);
-
-                return Ok(());
-            }
-        };
-
-        let _handler = manager.join(guild_id, connect_to).await;
+        if let Err(why) = join_vc(ctx, manager.clone()).await {
+            check_msg(ctx.reply(why).await);
+        }
     }
 
     if let Some(handler_lock) = manager.get(guild_id) {
@@ -132,6 +103,8 @@ async fn play(ctx: Context<'_>, song: String) -> Result<(), Error> {
 
         // TODO: make this faster with less cloning
         let http_client = get_http_client(&ctx).await;
+
+        let is_url = song.starts_with("http");
         let mut source = if is_url {
             YoutubeDl::new(http_client, song)
         } else {
@@ -180,16 +153,12 @@ async fn pause(ctx: Context<'_>) -> Result<(), Error> {
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
 
-        match handler.queue().pause() {
-            Ok(s) => s,
-            Err(why) => {
-                error!("Err pausing source {:?}", why);
+        if let Err(why) = handler.queue().pause() {
+            error!("Err pausing source {:?}", why);
+            return Ok(());
+        }
 
-                return Ok(());
-            }
-        };
-
-        check_msg(ctx.say("Paused song").await);
+        check_msg(ctx.say("Paused current audio track.").await);
     } else {
         check_msg(ctx.say("Not in a voice channel.").await);
     }
@@ -210,16 +179,12 @@ async fn resume(ctx: Context<'_>) -> Result<(), Error> {
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
 
-        match handler.queue().resume() {
-            Ok(s) => s,
-            Err(why) => {
-                error!("Err resuming source {:?}", why);
+        if let Err(why) = handler.queue().resume() {
+            error!("Err resuming source {:?}", why);
+            return Ok(());
+        }
 
-                return Ok(());
-            }
-        };
-
-        check_msg(ctx.say("resume song").await);
+        check_msg(ctx.say("Resumed the current audio track.").await);
     } else {
         check_msg(ctx.say("Not in a voice channel.").await);
     }
@@ -263,16 +228,12 @@ async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
 
-        match handler.queue().skip() {
-            Ok(s) => s,
-            Err(why) => {
-                error!("Err skip source {:?}", why);
+        if let Err(why) = handler.queue().skip() {
+            error!("Err skip source {:?}", why);
+            return Ok(());
+        }
 
-                return Ok(());
-            }
-        };
-
-        check_msg(ctx.say("skipped song").await);
+        check_msg(ctx.say("Skipped audio track.").await);
     } else {
         check_msg(ctx.say("Not in a voice channel.").await);
     }
@@ -299,6 +260,7 @@ async fn info(ctx: Context<'_>) -> Result<(), Error> {
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
 
+        // TODO: handle empty case
         let list = handler.queue().current_queue();
         for (i, track) in list.iter().take(10).enumerate() {
             let metadata = get_metadata(track).await;
@@ -325,6 +287,31 @@ async fn info(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+async fn join_vc(ctx: Context<'_>, manager: Arc<Songbird>) -> Result<(), String> {
+    let (guild_id, channel_id) = {
+        let guild = ctx.guild().unwrap();
+
+        let channel_id = guild
+            .voice_states
+            .get(&ctx.author().id)
+            .and_then(|voice_state| voice_state.channel_id);
+        (guild.id, channel_id)
+    };
+    let connect_to = match channel_id {
+        Some(channel) => channel,
+        None => {
+            return Err("User not in a voice channel.".to_string());
+        }
+    };
+
+    if let Err(why) = manager.join(guild_id, connect_to).await {
+        debug!("Failed to join vc: {}", why);
+        return Err("Failed to join voice channel.".to_string());
+    }
+
+    return Ok(());
 }
 
 async fn get_metadata(track_handle: &TrackHandle) -> (String, String) {
