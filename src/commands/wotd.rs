@@ -9,7 +9,7 @@ use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 )]
 pub async fn word(ctx: Context<'_>) -> Result<(), Error> {
     let dt = Utc::now().format("%B %d, %Y");
-    let color = utils::COLORS.choose(&mut rand::thread_rng()).unwrap();
+    let color = utils::COLORS.choose(&mut rand::rng()).unwrap();
 
     let Ok(res) = word::get_word().await else {
         ctx.say("Had a problem parsing JSON!").await?;

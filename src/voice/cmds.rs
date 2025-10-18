@@ -311,7 +311,7 @@ async fn join_vc(ctx: Context<'_>, manager: Arc<Songbird>) -> Result<(), String>
         return Err("Failed to join voice channel.".to_string());
     }
 
-    return Ok(());
+    Ok(())
 }
 
 async fn get_metadata(track_handle: &TrackHandle) -> (String, String) {
