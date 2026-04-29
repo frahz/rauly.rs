@@ -11,7 +11,7 @@ anyhow = "1"
 dotenvy = "0.15"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-rand = "0.9"
+rand = "0.10"
 chrono = "0.4"
 chrono-tz = "0.10"
 poise = "0.6"
@@ -19,7 +19,7 @@ serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 
 [dependencies.songbird]
-version = "0.4.6"
+version = "0.6"
 features = ["builtin-queue"]
 
 [dependencies.symphonia]
@@ -35,5 +35,5 @@ version = "0.12"
 features = ["framework", "standard_framework", "voice"]
 
 [dependencies.reqwest]
-version = "0.11"
+version = "0.12"
 features = ["json"]

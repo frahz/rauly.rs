@@ -4,6 +4,7 @@ use poise::ReplyHandle;
 use reqwest::Client as HttpClient;
 use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 use serenity::prelude::TypeMapKey;
+use songbird::tracks::Track;
 use songbird::{
     input::{Compose, YoutubeDl},
     tracks::TrackHandle,
@@ -18,10 +19,7 @@ impl TypeMapKey for VoiceHttpKey {
     type Value = HttpClient;
 }
 
-struct TrackInfo;
-impl TypeMapKey for TrackInfo {
-    type Value = (String, String);
-}
+struct TrackInfo(String, String);
 
 #[poise::command(
     slash_command,
@@ -112,8 +110,7 @@ async fn play(ctx: Context<'_>, song: String) -> Result<(), Error> {
         };
 
         debug!("Source: {source:?}");
-        let handle = handler.enqueue_input(source.clone().into()).await;
-        if let Ok(metadata) = source.aux_metadata().await {
+        let info = if let Ok(metadata) = source.aux_metadata().await {
             debug!("metadata: {metadata:?}");
             let url = match metadata.source_url {
                 Some(url) => url,
@@ -123,12 +120,15 @@ async fn play(ctx: Context<'_>, song: String) -> Result<(), Error> {
                 Some(title) => title,
                 None => "Title".to_string(),
             };
-            handle
-                .typemap()
-                .write()
-                .await
-                .insert::<TrackInfo>((title, url));
-        }
+            TrackInfo(title, url)
+        } else {
+            TrackInfo(
+                "Title".to_string(),
+                "https://en.wikipedia.org/wiki/HTTP_404".to_string(),
+            )
+        };
+        let track = Track::new_with_data(source.clone().into(), Arc::new(info));
+        let _ = handler.enqueue(track).await;
         let embed = song_embed(&mut source, handler.queue().len()).await;
 
         let msg = poise::CreateReply::default().embed(embed);
@@ -314,12 +314,8 @@ async fn join_vc(ctx: Context<'_>, manager: Arc<Songbird>) -> Result<(), String>
     Ok(())
 }
 
-async fn get_metadata(track_handle: &TrackHandle) -> (String, String) {
-    let typemap = track_handle.typemap().read().await;
-    typemap
-        .get::<TrackInfo>()
-        .cloned()
-        .expect("This shouldn't be empty")
+async fn get_metadata(track_handle: &TrackHandle) -> Arc<TrackInfo> {
+    track_handle.data::<_>()
 }
 
 async fn get_http_client(ctx: &Context<'_>) -> HttpClient {
